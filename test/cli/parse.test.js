@@ -421,3 +421,74 @@ describe('nodemon --startUpWatchDelay argument', function () {
     assert(settings.startUpWatchDelay === 500, 'startUpWatchDelay set');
   });
 });
+
+describe('nodemon --restartLoopGuard argument', function () {
+  it('should enable with defaults when no value is given', function () {
+    var settings = cli.parse(
+      'node nodemon --restartLoopGuard test/fixtures/app.js'
+    );
+    assert(settings.restartLoopGuard === true, 'guard enabled');
+    assert(
+      settings.script === 'test/fixtures/app.js',
+      'script not consumed as guard value'
+    );
+  });
+
+  it('should accept a max-only value', function () {
+    var settings = cli.parse(
+      'node nodemon --restartLoopGuard 5 test/fixtures/app.js'
+    );
+    assert(settings.restartLoopGuard.max === 5, 'max 5');
+    assert(settings.restartLoopGuard.window === 10000, 'default window 10s');
+  });
+
+  it('should accept max/window with seconds', function () {
+    var settings = cli.parse(
+      'node nodemon --restartLoopGuard 10/5s test/fixtures/app.js'
+    );
+    assert(settings.restartLoopGuard.max === 10);
+    assert(settings.restartLoopGuard.window === 5000);
+  });
+
+  it('should accept max/window with milliseconds', function () {
+    var settings = cli.parse(
+      'node nodemon --restartLoopGuard 3/500ms test/fixtures/app.js'
+    );
+    assert(settings.restartLoopGuard.max === 3);
+    assert(settings.restartLoopGuard.window === 500);
+  });
+
+  it('should support the kebab-case alias', function () {
+    var settings = cli.parse(
+      'node nodemon --restart-loop-guard 2/1s test/fixtures/app.js'
+    );
+    assert(settings.restartLoopGuard.max === 2);
+    assert(settings.restartLoopGuard.window === 1000);
+  });
+
+  it('should not affect delay when both are set', function () {
+    var settings = cli.parse(
+      'node nodemon --delay 1 --restartLoopGuard 5/2s test/fixtures/app.js'
+    );
+    assert(settings.delay === 1000, 'delay unchanged');
+    assert(settings.restartLoopGuard.max === 5);
+  });
+});
+
+
+describe('nodemon --restartLoopGuard edge cases', function () {
+  it('parses true/false tokens', function () {
+    var on = cli.parse('node nodemon --restartLoopGuard true');
+    assert.strictEqual(on.restartLoopGuard, true);
+    var off = cli.parse('node nodemon --restartLoopGuard false');
+    assert.strictEqual(off.restartLoopGuard, false);
+  });
+
+  it('falls back to defaults for invalid max token', function () {
+    // "0" does not match optional-value pattern /^\d/ wait - 0 matches \d+
+    // parseRestartLoopGuard(0) -> max NaN or 0 -> returns true for invalid
+    var settings = cli.parse('node nodemon --restartLoopGuard 0/1s');
+    // max 0 is invalid -> true (defaults at runtime)
+    assert.strictEqual(settings.restartLoopGuard, true);
+  });
+});

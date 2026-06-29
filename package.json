@@ -31,7 +31,7 @@
   "main": "./lib/nodemon",
   "scripts": {
     "commitmsg": "commitlint -e",
-    "coverage": "istanbul cover _mocha -- --timeout 30000 --ui bdd --reporter list test/**/*.test.js",
+    "coverage": "istanbul cover _mocha -- --timeout 30000 --ui bdd --reporter list 'test/**/*.test.js'",
     "lint": "eslint lib/**/*.js",
     "test": "npm run lint && npm run spec",
     "spec": "for FILE in test/**/*.test.js; do echo $FILE; TEST=1 mocha --exit --timeout 30000 $FILE; if [ $? -ne 0 ]; then exit 1; fi; sleep 1; done",

@@ -94,6 +94,22 @@ export interface NodemonConfig {
    * Separate from `delay`, which debounces restarts after a file change.
    */
   startUpWatchDelay?: number;
+  /**
+   * Pause automatic file-change restarts when too many happen in a time window.
+   * - false / unset: disabled (default; normal restart behavior)
+   * - true: enable with defaults (10 restarts / 10000ms)
+   * - number: max restarts in the default 10000ms window
+   * - { max, window }: max restarts within window (ms)
+   * Manual restart (`rs` / signal) is not blocked.
+   */
+  restartLoopGuard?:
+    | boolean
+    | number
+    | {
+        max: number;
+        /** window in milliseconds */
+        window?: number;
+      };
   monitor?: string[];
   spawn?: boolean;
   noUpdateNotifier?: boolean;

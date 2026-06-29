@@ -180,21 +180,18 @@ describe('when nodemon runs (2)', function () {
       assert(true, 'nodemon is waiting for a change');
 
       setTimeout(function () {
-        process.once('SIGINT', function () {
-          // do nothing
-        });
-
-        process.kill(process.pid, 'SIGINT');
+        // Emit quit via the nodemon API instead of signaling this process with
+        // SIGINT — mocha treats SIGINT as "abort the suite", which skipped all
+        // later tests and under-reported coverage.
+        nodemon.emit('quit');
       }, 1000);
     }).on('crash', function () {
       assert(false, 'detected crashed state');
     }).on('exit', function () {
       assert(true, 'quit correctly');
       nodemon.reset(done);
-
-      setTimeout(function () {
-        process.kill(process.pid, 'SIGINT');
-      }, 1000);
     });
   });
 });
+
+

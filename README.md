@@ -277,6 +277,47 @@ In `nodemon.json` / `package.json` `nodemonConfig`, the value is always millisec
 
 You can combine both options when needed: `startUpWatchDelay` suppresses the restart loop on boot; `delay` still debounces restarts from later edits.
 
+## Restart loop guard
+
+If something keeps changing watched files (or your app keeps writing to them), nodemon can restart in a tight loop. Enable **`restartLoopGuard`** so that when too many *automatic* file-change restarts happen within a short time window, nodemon **pauses** further automatic restarts and prints a clear warning instead of looping forever.
+
+This is **off by default**. When unset or `false`, restart behavior is unchanged. Manual restart (`rs` or the configured restartable command / signal) is **not** blocked.
+
+**CLI** (optional value; defaults are 10 restarts in 10 seconds):
+
+```bash
+# enable with defaults (10 restarts / 10s)
+nodemon --restartLoopGuard server.js
+
+# max 5 restarts in the default 10s window
+nodemon --restartLoopGuard 5 server.js
+
+# max 10 restarts within 5 seconds
+nodemon --restartLoopGuard 10/5s server.js
+
+# same with an explicit milliseconds window
+nodemon --restartLoopGuard 10/5000ms server.js
+```
+
+**Config** (`nodemon.json` / `nodemonConfig`):
+
+```json
+{
+  "restartLoopGuard": true
+}
+```
+
+```json
+{
+  "restartLoopGuard": {
+    "max": 10,
+    "window": 10000
+  }
+}
+```
+
+`window` in config is always milliseconds. After the window slides past older restarts, automatic restarts are allowed again; or type `rs` to force a restart while paused.
+
 ## Gracefully reloading your script
 
 It is possible to have nodemon send any signal that you specify to your application.
