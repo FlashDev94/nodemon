@@ -390,58 +390,125 @@ nodemon --restartOn change,add server.js
 
 ## MCP server mode (agent inspection & control)
 
-Nodemon can expose an **MCP (Model Context Protocol) server** so an agent (or simple HTTP tools) can inspect runtime status, watched files, restart history, and logs, and can **restart** or **quit** nodemon.
+Nodemon can expose an **opt-in MCP (Model Context Protocol) surface** so an agent (or plain HTTP/`curl`) can inspect runtime status, watched files, restart history, and logs, and can **restart** or **quit** nodemon.
 
-**Off by default.** When `mcp` is not enabled, behavior is identical to normal nodemon (MCP modules are not started).
+**Off by default.** If you do not pass `--mcp` / set `"mcp": true`, behavior is unchanged and MCP is not started.
 
-### Enable (HTTP + SSE, recommended for local testing)
+> **Practical note:** For hands-on testing in a terminal, use the **REST `/api/*` endpoints** below. They call the **same handlers** as the MCP tools. Full MCP SSE is available at `GET /mcp` for clients that implement the older HTTP+SSE transport; most “quick tests” should use REST.
+
+### 1) Start nodemon with MCP (HTTP)
+
+From this repo (or any install where `nodemon` is on your `PATH`):
 
 ```bash
+# from the nodemon repo checkout:
+node ./bin/nodemon.js --mcp --mcpPort 8765 --ext js test/fixtures/app.js
+
+# if nodemon is installed globally / via npx:
 nodemon --mcp --mcpPort 8765 server.js
 ```
 
-You should see a log line like:
+Wait for a line like:
 
 ```text
-[nodemon] MCP server listening on http://127.0.0.1:8765 (SSE /mcp, REST /api/*)
+[nodemon] MCP HTTP on http://127.0.0.1:8765 — try GET /api/status or GET /api/tools (SSE on /mcp)
+[nodemon] starting `node …`
 ```
 
-**MCP (SSE)** for MCP clients:
+If the port is busy, pick another: `--mcpPort 8877`.
 
-- SSE stream: `GET http://127.0.0.1:8765/mcp`
-- Messages: `POST http://127.0.0.1:8765/messages?sessionId=...`
+### 2) REST API (recommended for testing — no MCP client)
 
-**REST helpers** (easy to test with `curl`):
+Base URL: `http://127.0.0.1:8765` (or your `--mcpPort`).
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/health` | Liveness |
+| GET | `/health` | Liveness + tool name list |
 | GET | `/api/status` | Runtime status + config summary |
+| GET | `/api/config` | Config summary only |
 | GET | `/api/watched?limit=50` | Watched files |
 | GET | `/api/history` | Restart history |
-| GET | `/api/logs?limit=50` | Recent nodemon logs |
-| POST | `/api/restart` | Trigger restart |
-| POST | `/api/quit` | Quit nodemon |
+| GET | `/api/logs?limit=50` | Recent nodemon logs (`?type=status` optional) |
+| GET | `/api/tools` | List MCP tool names/descriptions |
+| POST | `/api/tools/<name>` | **Invoke a tool** (JSON body = arguments) |
+| POST | `/api/restart` | Same as tool `nodemon_restart` |
+| POST | `/api/quit` | Same as tool `nodemon_quit` (exits nodemon) |
 
-**MCP tools** registered for agents:
-
-- `nodemon_status`
-- `nodemon_watched_files`
-- `nodemon_restart_history`
-- `nodemon_logs`
-- `nodemon_config`
-- `nodemon_restart`
-- `nodemon_quit`
-
-### Enable (stdio, for MCP clients that spawn the process)
+**Example session (second terminal):**
 
 ```bash
-nodemon --mcp-stdio server.js
+PORT=8765
+BASE=http://127.0.0.1:$PORT
+
+curl -s $BASE/health
+curl -s $BASE/api/status
+curl -s "$BASE/api/watched?limit=20"
+curl -s $BASE/api/tools
+
+# invoke tools (same as MCP tools/call)
+curl -s -X POST $BASE/api/tools/nodemon_status
+curl -s -X POST $BASE/api/tools/nodemon_logs -H 'Content-Type: application/json' -d '{"limit":10}'
+curl -s -X POST $BASE/api/tools/nodemon_restart
+curl -s $BASE/api/history
+
+# stop nodemon entirely:
+# curl -s -X POST $BASE/api/quit
 ```
 
-Configure your MCP client to run that command as the server (stdio transport). Note that stdio is reserved for MCP, so prefer **HTTP** when you still want normal terminal output.
+One-shot smoke script from the repo:
 
-### Config
+```bash
+bash scripts/mcp-smoke.sh 8765
+```
+
+### 3) MCP tools (for agents)
+
+These names are what an MCP client lists/calls (and what `POST /api/tools/<name>` runs):
+
+| Tool | Arguments | Effect |
+| --- | --- | --- |
+| `nodemon_status` | — | Status snapshot |
+| `nodemon_watched_files` | `limit?` | Watched files |
+| `nodemon_restart_history` | `limit?` | Restart history |
+| `nodemon_logs` | `limit?`, `type?` | Nodemon logs |
+| `nodemon_config` | — | Config summary |
+| `nodemon_restart` | — | Restart child |
+| `nodemon_quit` | — | Quit nodemon |
+
+**SSE MCP transport** (optional, for compatible MCP clients):
+
+- Stream: `GET http://127.0.0.1:8765/mcp`
+- Client then `POST` JSON-RPC to `/messages?sessionId=…` (session id comes from the SSE `endpoint` event)
+- This is the SDK’s **HTTP+SSE** style transport. If your client only supports **stdio** or **streamable HTTP**, use `--mcp-stdio` or the REST `/api/tools/*` bridge instead of assuming SSE works out of the box.
+
+### 4) stdio MCP (client spawns nodemon)
+
+```bash
+node ./bin/nodemon.js --mcp-stdio --ext js test/fixtures/app.js
+```
+
+Example MCP client config shape (paths vary by product):
+
+```json
+{
+  "mcpServers": {
+    "nodemon": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/nodemon/bin/nodemon.js",
+        "--mcp-stdio",
+        "--ext",
+        "js",
+        "/absolute/path/to/your/app.js"
+      ]
+    }
+  }
+}
+```
+
+**Caveat:** stdio is owned by the MCP protocol — do not expect normal interactive TTY/`rs` use on the same streams. Prefer **HTTP `--mcp`** while developing.
+
+### Config (`nodemon.json`)
 
 ```json
 {
@@ -450,20 +517,6 @@ Configure your MCP client to run that command as the server (stdio transport). N
   "mcpHost": "127.0.0.1",
   "mcpTransport": "http"
 }
-```
-
-### Quick curl test
-
-```bash
-# terminal 1
-nodemon --mcp --mcpPort 8765 test/fixtures/app.js
-
-# terminal 2
-curl -s http://127.0.0.1:8765/api/status | jq .
-curl -s http://127.0.0.1:8765/api/watched?limit=20 | jq .
-curl -s -X POST http://127.0.0.1:8765/api/restart
-curl -s http://127.0.0.1:8765/api/history | jq .
-curl -s http://127.0.0.1:8765/api/logs?limit=10 | jq .
 ```
 
 ## Gracefully reloading your script
