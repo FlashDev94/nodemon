@@ -508,3 +508,49 @@ describe('nodemon --restartReason argument', function () {
     assert.strictEqual(settings.restartReason, true);
   });
 });
+
+describe('nodemon --restartOn argument', function () {
+  it('should parse all', function () {
+    var settings = cli.parse(
+      'node nodemon --restartOn all test/fixtures/app.js'
+    );
+    assert.strictEqual(settings.restartOn, 'all');
+  });
+
+  it('should parse change', function () {
+    var settings = cli.parse(
+      'node nodemon --restartOn change test/fixtures/app.js'
+    );
+    assert.strictEqual(settings.restartOn, 'change');
+  });
+
+  it('should parse add', function () {
+    var settings = cli.parse(
+      'node nodemon --restartOn add test/fixtures/app.js'
+    );
+    assert.strictEqual(settings.restartOn, 'add');
+  });
+
+  it('should parse comma-separated list', function () {
+    var settings = cli.parse(
+      'node nodemon --restartOn change,add test/fixtures/app.js'
+    );
+    assert(Array.isArray(settings.restartOn));
+    assert.deepEqual(settings.restartOn, ['change', 'add']);
+  });
+
+  it('should support kebab-case alias', function () {
+    var settings = cli.parse(
+      'node nodemon --restart-on change test/fixtures/app.js'
+    );
+    assert.strictEqual(settings.restartOn, 'change');
+  });
+
+  it('should not affect restartReason when both are set', function () {
+    var settings = cli.parse(
+      'node nodemon --restartReason --restartOn change test/fixtures/app.js'
+    );
+    assert.strictEqual(settings.restartReason, true);
+    assert.strictEqual(settings.restartOn, 'change');
+  });
+});

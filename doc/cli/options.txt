@@ -28,6 +28,8 @@ Watching
                              still works. Not the same as --delay.
   --restartReason .......... print why nodemon restarted (file change, rs, …)
                              at status level; also always on restart event arg 2
+  --restartOn <events> ..... which file events trigger restart: all (default),
+                             change, add, unlink, or comma list (change,add)
   -L, --legacy-watch ....... use polling to watch for changes (typically needed
                              when watching over a network/Docker)
   -P, --polling-interval ... combined with -L, milliseconds to poll for (default 100)
