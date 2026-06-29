@@ -318,6 +318,42 @@ nodemon --restartLoopGuard 10/5000ms server.js
 
 `window` in config is always milliseconds. After the window slides past older restarts, automatic restarts are allowed again; or type `rs` to force a restart while paused.
 
+## Filtering which file events restart the app (`restartOn`)
+
+By default nodemon restarts on **change**, **add**, and **unlink** (delete) events — same as always. Use **`restartOn`** to limit which filesystem events trigger a restart.
+
+| Value | Restarts on |
+| --- | --- |
+| `all` (default) | change, add, and unlink |
+| `change` | modifications only |
+| `add` | new files only (after the initial watch is ready) |
+| `unlink` | deletions only |
+| `change,add` | combination (comma-separated or array in config) |
+
+Unset / `all` keeps **full backward compatibility** with previous nodemon behavior. Manual restart (`rs`) is not affected.
+
+**CLI**
+
+```bash
+nodemon --restartOn change server.js
+nodemon --restartOn add server.js
+nodemon --restartOn change,add server.js
+```
+
+**Config**
+
+```json
+{
+  "restartOn": "change"
+}
+```
+
+```json
+{
+  "restartOn": ["change", "add"]
+}
+```
+
 ## Gracefully reloading your script
 
 It is possible to have nodemon send any signal that you specify to your application.

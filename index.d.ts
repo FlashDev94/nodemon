@@ -110,6 +110,13 @@ export interface NodemonConfig {
         /** window in milliseconds */
         window?: number;
       };
+  /**
+   * Which filesystem events trigger a restart.
+   * - 'all' (default): change, add, and unlink — same as historical nodemon
+   * - 'change' | 'add' | 'unlink': only that event
+   * - array or comma-separated list, e.g. ['change','add'] or 'change,add'
+   */
+  restartOn?: 'all' | 'change' | 'add' | 'unlink' | string | string[];
   monitor?: string[];
   spawn?: boolean;
   noUpdateNotifier?: boolean;
