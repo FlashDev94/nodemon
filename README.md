@@ -388,6 +388,84 @@ nodemon --restartOn change,add server.js
 
 `restartOn` and `restartReason` are independent: you can filter which events restart the process and still receive (or log) why a restart occurred.
 
+## MCP server mode (agent inspection & control)
+
+Nodemon can expose an **MCP (Model Context Protocol) server** so an agent (or simple HTTP tools) can inspect runtime status, watched files, restart history, and logs, and can **restart** or **quit** nodemon.
+
+**Off by default.** When `mcp` is not enabled, behavior is identical to normal nodemon (MCP modules are not started).
+
+### Enable (HTTP + SSE, recommended for local testing)
+
+```bash
+nodemon --mcp --mcpPort 8765 server.js
+```
+
+You should see a log line like:
+
+```text
+[nodemon] MCP server listening on http://127.0.0.1:8765 (SSE /mcp, REST /api/*)
+```
+
+**MCP (SSE)** for MCP clients:
+
+- SSE stream: `GET http://127.0.0.1:8765/mcp`
+- Messages: `POST http://127.0.0.1:8765/messages?sessionId=...`
+
+**REST helpers** (easy to test with `curl`):
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/health` | Liveness |
+| GET | `/api/status` | Runtime status + config summary |
+| GET | `/api/watched?limit=50` | Watched files |
+| GET | `/api/history` | Restart history |
+| GET | `/api/logs?limit=50` | Recent nodemon logs |
+| POST | `/api/restart` | Trigger restart |
+| POST | `/api/quit` | Quit nodemon |
+
+**MCP tools** registered for agents:
+
+- `nodemon_status`
+- `nodemon_watched_files`
+- `nodemon_restart_history`
+- `nodemon_logs`
+- `nodemon_config`
+- `nodemon_restart`
+- `nodemon_quit`
+
+### Enable (stdio, for MCP clients that spawn the process)
+
+```bash
+nodemon --mcp-stdio server.js
+```
+
+Configure your MCP client to run that command as the server (stdio transport). Note that stdio is reserved for MCP, so prefer **HTTP** when you still want normal terminal output.
+
+### Config
+
+```json
+{
+  "mcp": true,
+  "mcpPort": 8765,
+  "mcpHost": "127.0.0.1",
+  "mcpTransport": "http"
+}
+```
+
+### Quick curl test
+
+```bash
+# terminal 1
+nodemon --mcp --mcpPort 8765 test/fixtures/app.js
+
+# terminal 2
+curl -s http://127.0.0.1:8765/api/status | jq .
+curl -s http://127.0.0.1:8765/api/watched?limit=20 | jq .
+curl -s -X POST http://127.0.0.1:8765/api/restart
+curl -s http://127.0.0.1:8765/api/history | jq .
+curl -s http://127.0.0.1:8765/api/logs?limit=10 | jq .
+```
+
 ## Gracefully reloading your script
 
 It is possible to have nodemon send any signal that you specify to your application.

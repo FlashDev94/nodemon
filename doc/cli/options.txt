@@ -30,6 +30,11 @@ Watching
                              at status level; also always on restart event arg 2
   --restartOn <events> ..... which file events trigger restart: all (default),
                              change, add, unlink, or comma list (change,add)
+  --mcp .................... enable MCP server (HTTP+SSE on --mcpPort, default
+                             8765). Off by default; normal mode unchanged.
+  --mcp-stdio .............. MCP over stdio (for MCP clients that spawn nodemon)
+  --mcpPort <n> ............ MCP HTTP port (default 8765)
+  --mcpHost <host> ......... MCP HTTP bind host (default 127.0.0.1)
   -L, --legacy-watch ....... use polling to watch for changes (typically needed
                              when watching over a network/Docker)
   -P, --polling-interval ... combined with -L, milliseconds to poll for (default 100)

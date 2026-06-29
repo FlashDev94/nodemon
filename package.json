@@ -57,6 +57,7 @@
     "should": "~4.0.0"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
     "chokidar": "^3.5.2",
     "debug": "^4",
     "ignore-by-default": "^1.0.1",

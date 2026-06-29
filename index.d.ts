@@ -137,6 +137,17 @@ export interface NodemonConfig {
    * - array or comma-separated list, e.g. ['change','add'] or 'change,add'
    */
   restartOn?: 'all' | 'change' | 'add' | 'unlink' | string | string[];
+  /**
+   * Enable MCP server mode (default false). When false, behavior is unchanged
+   * and MCP code is not started.
+   */
+  mcp?: boolean;
+  /** MCP HTTP port when using http transport (default 8765) */
+  mcpPort?: number;
+  /** MCP HTTP bind host (default 127.0.0.1) */
+  mcpHost?: string;
+  /** 'http' (SSE + REST) or 'stdio' */
+  mcpTransport?: 'http' | 'stdio' | string;
   monitor?: string[];
   spawn?: boolean;
   noUpdateNotifier?: boolean;
