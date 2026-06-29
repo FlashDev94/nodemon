@@ -16,13 +16,27 @@ export type NodemonEventListener = {
   on(event: 'start' | 'crash' | 'readable', listener: () => void): Nodemon;
   on(event: 'log', listener: (e: NodemonEventLog) => void): Nodemon;
   on(event: 'stdout' | 'stderr', listener: (e: string) => void): Nodemon;
-  on(event: 'restart', listener: (files?: string[]) => void): Nodemon;
+  on(
+    event: 'restart',
+    listener: (files?: string[], reason?: NodemonRestartReason) => void,
+  ): Nodemon;
   on(event: 'quit', listener: (e?: NodemonEventQuit) => void): Nodemon;
   on(event: 'exit', listener: (e?: number) => void): Nodemon;
   on(
     event: 'config:update',
     listener: (e?: NodemonEventConfig) => void,
   ): Nodemon;
+};
+
+/** Why nodemon restarted (2nd argument to the `restart` event). */
+export type NodemonRestartReason = {
+  /** watch = file change; manual = typed rs; api = nodemon.restart(); signal = process signal */
+  type: 'watch' | 'manual' | 'api' | 'signal' | string;
+  files?: string[];
+  /** e.g. "rs" when type is manual */
+  trigger?: string;
+  /** e.g. "SIGHUP" when type is signal */
+  signal?: string;
 };
 
 export type NodemonEventLog = {
@@ -110,6 +124,12 @@ export interface NodemonConfig {
         /** window in milliseconds */
         window?: number;
       };
+  /**
+   * When true, print restart reason at status level (always visible).
+   * The `restart` event always receives reason as its 2nd argument regardless.
+   * Default false (reason only in --verbose / detail logs).
+   */
+  restartReason?: boolean;
   monitor?: string[];
   spawn?: boolean;
   noUpdateNotifier?: boolean;

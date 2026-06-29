@@ -318,6 +318,36 @@ nodemon --restartLoopGuard 10/5000ms server.js
 
 `window` in config is always milliseconds. After the window slides past older restarts, automatic restarts are allowed again; or type `rs` to force a restart while paused.
 
+## Restart reason
+
+Nodemon can tell you **why** it restarted. The `restart` event always receives an optional **second argument** (existing listeners that only use `files` keep working):
+
+| `reason.type` | Meaning |
+| --- | --- |
+| `watch` | A watched file changed (`reason.files` lists paths) |
+| `manual` | User typed the restartable command (default `rs`) |
+| `api` | `nodemon.restart()` / programmatic restart |
+| `signal` | Process signal used to request a restart |
+
+```js
+require('nodemon')({ script: 'server.js' }).on('restart', function (files, reason) {
+  console.log('restart type:', reason && reason.type);
+  if (files) console.log('files:', files);
+});
+```
+
+By default the reason is only written to **detail** logs (`--verbose`). To always print it at status level:
+
+```bash
+nodemon --restartReason server.js
+```
+
+```json
+{
+  "restartReason": true
+}
+```
+
 ## Gracefully reloading your script
 
 It is possible to have nodemon send any signal that you specify to your application.

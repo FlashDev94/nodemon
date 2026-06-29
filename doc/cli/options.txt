@@ -26,6 +26,8 @@ Watching
   --restartLoopGuard [n|/w]  pause automatic restarts if they happen too often
                              (e.g. 10 or 10/5s). Off by default. Manual `rs`
                              still works. Not the same as --delay.
+  --restartReason .......... print why nodemon restarted (file change, rs, …)
+                             at status level; also always on restart event arg 2
   -L, --legacy-watch ....... use polling to watch for changes (typically needed
                              when watching over a network/Docker)
   -P, --polling-interval ... combined with -L, milliseconds to poll for (default 100)

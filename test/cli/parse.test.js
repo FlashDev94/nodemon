@@ -492,3 +492,19 @@ describe('nodemon --restartLoopGuard edge cases', function () {
     assert.strictEqual(settings.restartLoopGuard, true);
   });
 });
+
+describe('nodemon --restartReason argument', function () {
+  it('should enable restartReason flag', function () {
+    var settings = cli.parse(
+      'node nodemon --restartReason test/fixtures/app.js'
+    );
+    assert.strictEqual(settings.restartReason, true);
+  });
+
+  it('should support kebab-case alias', function () {
+    var settings = cli.parse(
+      'node nodemon --restart-reason test/fixtures/app.js'
+    );
+    assert.strictEqual(settings.restartReason, true);
+  });
+});

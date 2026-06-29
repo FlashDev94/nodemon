@@ -17,12 +17,18 @@ nodemon.on('start', function () {
 }).on('quit', function () {
   console.log('App has quit');
   process.exit();
-}).on('restart', function (files) {
+}).on('restart', function (files, reason) {
+  // `files` is set for watch-triggered restarts (backward compatible).
+  // `reason` describes why: { type: 'watch'|'manual'|'api'|'signal', ... }
   console.log('App restarted due to: ', files);
+  console.log('Restart reason: ', reason && reason.type);
 });
 ```
 
+Enable status-level restart reason logs with `{ restartReason: true }` or `--restartReason`.
+
 Nodemon will emit a number of [events](https://github.com/remy/nodemon/blob/master/doc/events.md) by default, and when in verbose mode will also emit a `log` event (which matches what the nodemon cli tool echoes).
+
 
 ## Arguments
 
