@@ -48,9 +48,16 @@ describe('terminal signals', function () {
 
   it('should terminate nodemon (after ~10 seconds)', function (done) {
     runAndKill(done, appjs + ' --dont-exit', function (childPID) {
-      // make sure we don't keep abandoned child
-      process.kill(childPID, 'SIGTERM');
+      // make sure we don't keep abandoned child (may already be gone)
+      if (childPID) {
+        try {
+          process.kill(childPID, 'SIGTERM');
+        } catch (e) {
+          // ESRCH: process already exited
+        }
+      }
       done();
     });
   });
 });
+

@@ -393,3 +393,31 @@ describe('nodemon --delay argument', function () {
     assert(settings.delay === 1200, 'delay 1.2 seconds');
   });
 });
+
+describe('nodemon --startUpWatchDelay argument', function () {
+  it('should support an integer value (seconds)', function () {
+    var settings = cli.parse('node nodemon --startUpWatchDelay 2');
+    assert(settings.startUpWatchDelay === 2000, 'startUpWatchDelay 2 seconds');
+  });
+
+  it('should support a float value (seconds)', function () {
+    var settings = cli.parse('node nodemon --startUpWatchDelay 1.5');
+    assert(settings.startUpWatchDelay === 1500, 'startUpWatchDelay 1.5 seconds');
+  });
+
+  it('should support a value with a time specifier for milliseconds (ms)', function () {
+    var settings = cli.parse('node nodemon --startUpWatchDelay 500ms');
+    assert(settings.startUpWatchDelay === 500, 'startUpWatchDelay 500ms');
+  });
+
+  it('should support the kebab-case alias', function () {
+    var settings = cli.parse('node nodemon --startup-watch-delay 300ms');
+    assert(settings.startUpWatchDelay === 300, 'startup-watch-delay alias');
+  });
+
+  it('should not affect the existing delay option', function () {
+    var settings = cli.parse('node nodemon --delay 1 --startUpWatchDelay 500ms');
+    assert(settings.delay === 1000, 'delay unchanged');
+    assert(settings.startUpWatchDelay === 500, 'startUpWatchDelay set');
+  });
+});

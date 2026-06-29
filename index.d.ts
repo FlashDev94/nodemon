@@ -88,6 +88,12 @@ export interface NodemonConfig {
   cwd?: string;
   dump?: boolean;
   delay?: number;
+  /**
+   * Milliseconds to ignore file changes after the child process starts.
+   * Prevents restart loops when apps write generated files on startup.
+   * Separate from `delay`, which debounces restarts after a file change.
+   */
+  startUpWatchDelay?: number;
   monitor?: string[];
   spawn?: boolean;
   noUpdateNotifier?: boolean;

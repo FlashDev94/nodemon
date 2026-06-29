@@ -253,6 +253,30 @@ nodemon --delay 2.5
 }
 ```
 
+## Ignoring changes right after startup
+
+Some applications write generated files (caches, compiled assets, lock files, etc.) as soon as they start. Nodemon can see those writes and restart the process immediately, which can create a restart loop.
+
+Use `--startUpWatchDelay` (or `startUpWatchDelay` in config) to ignore file changes for a short period **after the child process starts**. Once that window ends, normal watching resumes. This is **not** the same as `--delay`, which waits *after a file change* before restarting.
+
+```bash
+# ignore changes for 2 seconds after each start
+nodemon --startUpWatchDelay 2 server.js
+
+# or with an explicit milliseconds specifier
+nodemon --startUpWatchDelay 2000ms server.js
+```
+
+In `nodemon.json` / `package.json` `nodemonConfig`, the value is always milliseconds:
+
+```json
+{
+  "startUpWatchDelay": 2000
+}
+```
+
+You can combine both options when needed: `startUpWatchDelay` suppresses the restart loop on boot; `delay` still debounces restarts from later edits.
+
 ## Gracefully reloading your script
 
 It is possible to have nodemon send any signal that you specify to your application.

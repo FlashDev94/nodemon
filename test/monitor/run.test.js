@@ -37,20 +37,27 @@ describe('when nodemon runs (2)', function () {
 
   it('should restart when new files are added', function (done) {
     fs.writeFileSync(tmp, 'setTimeout(function(){}, 10000)');
+    var settled = false;
+    function finish() {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      nodemon.reset(done);
+    }
 
     nodemon({
       script: tmp,
-    }).on('start', function () {
+    }).once('start', function () {
       setTimeout(function () {
         fs.writeFileSync(tmp2, 'setTimeout(function(){}, 10000)');
       }, 500);
-    }).on('restart', function () {
+    }).once('restart', function () {
       assert(fs.existsSync(tmp2), 'restarted after new file was added');
-      nodemon.once('exit', function () {
-        nodemon.reset(done);
-      }).emit('quit');
+      nodemon.once('exit', finish).emit('quit');
     });
   });
+
 
   it('should wait when the script crashes', function (done) {
     fs.writeFileSync(tmp, 'throw Error("forced crash")');

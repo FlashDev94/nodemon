@@ -197,4 +197,101 @@ describe('nodemon monitor child restart', function () {
         }, 1000);
       });
   });
+
+  it('should ignore file changes during startUpWatchDelay', function (done) {
+    write();
+    var restarted = false;
+    var settled = false;
+    function finish(err) {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      nodemon.reset(function () {
+        done(err);
+      });
+    }
+
+    setTimeout(function () {
+      nodemon({
+        script: tmpjs,
+        verbose: true,
+        ext: 'js',
+        // ignore changes for 2s after the child starts
+        startUpWatchDelay: 2000,
+      })
+        .once('start', function () {
+          // touch while still inside the startup ignore window
+          setTimeout(function () {
+            touch.sync(tmpjs);
+          }, 200);
+        })
+        .on('restart', function () {
+          restarted = true;
+        });
+
+      // after startUpWatchDelay has elapsed, we should not have restarted
+      setTimeout(function () {
+        try {
+          assert(
+            restarted === false,
+            'nodemon must not restart during startUpWatchDelay'
+          );
+        } catch (err) {
+          nodemon.once('exit', function () {
+            finish(err);
+          }).emit('quit');
+          return;
+        }
+        nodemon.once('exit', function () {
+          finish();
+        }).emit('quit');
+      }, 2500);
+    }, WAIT_BEFORE_START);
+  });
+
+  it('should restart after startUpWatchDelay expires', function (done) {
+    write();
+    var settled = false;
+    function finish(err) {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      nodemon.reset(function () {
+        done(err);
+      });
+    }
+
+    setTimeout(function () {
+      nodemon({
+        script: tmpjs,
+        verbose: true,
+        ext: 'js',
+        startUpWatchDelay: 500,
+      })
+        .once('start', function () {
+          // wait until after the startup ignore window, then touch
+          setTimeout(function () {
+            touch.sync(tmpjs);
+          }, 1000);
+        })
+        .once('restart', function (files) {
+          try {
+            assert(
+              files && files.length > 0,
+              'nodemon should restart after startUpWatchDelay expires'
+            );
+          } catch (err) {
+            nodemon.once('exit', function () {
+              finish(err);
+            }).emit('quit');
+            return;
+          }
+          nodemon.once('exit', function () {
+            finish();
+          }).emit('quit');
+        });
+    }, WAIT_BEFORE_START);
+  });
 });

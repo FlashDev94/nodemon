@@ -49,6 +49,7 @@
     "coffee-script": "~1.7.1",
     "eslint": "^7.32.0",
     "husky": "^7.0.4",
+    "istanbul": "^0.4.5",
     "mocha": "^2.5.3",
     "nyc": "^15.1.0",
     "proxyquire": "^1.8.0",

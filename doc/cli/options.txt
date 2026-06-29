@@ -20,6 +20,9 @@ Execution
 
 Watching
   -d, --delay n ............ debounce restart for "n" seconds
+  --startUpWatchDelay n .... ignore file changes for "n" seconds after startup
+                             (use to avoid restart loops when apps write
+                             generated files on start; not the same as --delay)
   -L, --legacy-watch ....... use polling to watch for changes (typically needed
                              when watching over a network/Docker)
   -P, --polling-interval ... combined with -L, milliseconds to poll for (default 100)

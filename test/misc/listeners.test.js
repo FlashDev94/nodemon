@@ -31,11 +31,21 @@ describe('listeners clean up', function () {
       'listeners',
     function (done) {
       function run(n) {
-        return function (done) {
+        return function (next) {
+          var settled = false;
+          function finish(err) {
+            if (settled) {
+              return;
+            }
+            settled = true;
+            next(err);
+          }
+
+          // script exits on its own; use once so async.series is not called twice
           nodemon(conf());
-          nodemon.on('start', function () {
-            nodemon.on('exit', function () {
-              nodemon.reset(done);
+          nodemon.once('start', function () {
+            nodemon.once('exit', function () {
+              nodemon.reset(finish);
             });
           });
         };
@@ -50,3 +60,4 @@ describe('listeners clean up', function () {
     }
   );
 });
+
