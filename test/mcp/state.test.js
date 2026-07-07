@@ -9,9 +9,9 @@ describe('mcp state', function () {
     state.resetState();
     state.bindBus(bus, { options: { watch: ['*.js'] }, system: { cwd: process.cwd() } });
 
-    bus.emit('start');
+    bus.emit('start', 4242);
     bus.emit('watching', '/tmp/a.js');
-    bus.emit('log', { type: 'detail', message: 'child pid: 4242' });
+    bus.emit('log', { type: 'status', message: 'starting app' });
     bus.emit('restart', ['/tmp/a.js'], { type: 'watch', files: ['/tmp/a.js'] });
 
     var snap = state.getSnapshot();
@@ -22,6 +22,27 @@ describe('mcp state', function () {
     assert.deepEqual(state.getWatchedFiles(), ['/tmp/a.js']);
     assert.equal(state.getRestartHistory().length, 1);
     assert(state.getLogs().length >= 1);
+    assert.strictEqual(snap.lastCrash, null);
+
+    state.resetState();
+  });
+
+  it('records lastCrash on crash event with exit code', function () {
+    state.resetState();
+    state.bindBus(bus, { options: {}, system: { cwd: process.cwd() } });
+
+    bus.emit('start', 111);
+    bus.emit('crash', 1);
+
+    var snap = state.getSnapshot();
+    assert.equal(snap.status, 'crashed');
+    assert.strictEqual(snap.childPid, null);
+    assert.equal(snap.lastExitCode, 1);
+    assert(snap.lastCrash);
+    assert.equal(snap.lastCrash.exitCode, 1);
+    assert.equal(snap.lastCrash.message, 'app crashed');
+    assert(snap.lastCrash.at);
+    assert.deepEqual(state.getLastCrash(), snap.lastCrash);
 
     state.resetState();
   });
@@ -29,5 +50,6 @@ describe('mcp state', function () {
   it('does nothing invasive until bindBus (mcp off)', function () {
     state.resetState();
     assert.equal(state.getSnapshot().enabled, false);
+    assert.strictEqual(state.getLastCrash(), null);
   });
 });

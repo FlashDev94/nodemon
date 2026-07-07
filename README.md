@@ -390,7 +390,7 @@ nodemon --restartOn change,add server.js
 
 ## MCP server mode (agent inspection & control)
 
-Nodemon can expose an **opt-in MCP (Model Context Protocol) surface** so an agent (or plain HTTP/`curl`) can inspect runtime status, watched files, restart history, and logs, and can **restart** or **quit** nodemon.
+Nodemon can expose an **opt-in MCP (Model Context Protocol) surface** so an agent (or plain HTTP/`curl`) can inspect runtime status, watched files, restart history, **last crash**, config, and logs, and can **restart** or **quit** nodemon safely.
 
 **Off by default.** If you do not pass `--mcp` / set `"mcp": true`, behavior is unchanged and MCP is not started.
 
@@ -467,13 +467,14 @@ These names are what an MCP client lists/calls (and what `POST /api/tools/<name>
 
 | Tool | Arguments | Effect |
 | --- | --- | --- |
-| `nodemon_status` | — | Status snapshot |
+| `nodemon_status` | — | Status snapshot (includes `lastCrash`, pids, config) |
 | `nodemon_watched_files` | `limit?` | Watched files |
 | `nodemon_restart_history` | `limit?` | Restart history |
+| `nodemon_last_crash` | — | Most recent crash details (`null` if none) |
 | `nodemon_logs` | `limit?`, `type?` | Nodemon logs |
 | `nodemon_config` | — | Config summary |
-| `nodemon_restart` | — | Restart child |
-| `nodemon_quit` | — | Quit nodemon |
+| `nodemon_restart` | — | Restart child (same as `rs` / API) |
+| `nodemon_quit` | — | Quit nodemon (response sent before exit) |
 
 **SSE MCP transport** (optional, for compatible MCP clients):
 

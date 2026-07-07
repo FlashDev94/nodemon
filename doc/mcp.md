@@ -1,6 +1,7 @@
 # Nodemon MCP mode
 
-Opt-in only (`--mcp` / `"mcp": true`). When off, no MCP server starts.
+Opt-in only (`--mcp` / `"mcp": true` in `nodemon.json`). When off, no MCP
+server starts and normal nodemon behavior is unchanged.
 
 ## What to use when testing
 
@@ -13,13 +14,40 @@ Opt-in only (`--mcp` / `"mcp": true`). When off, no MCP server starts.
 
 ## Tools
 
-- `nodemon_status`
-- `nodemon_watched_files` — body/args: `{ "limit": 50 }`
-- `nodemon_restart_history` — `{ "limit": 20 }`
-- `nodemon_logs` — `{ "limit": 50, "type": "status" }`
-- `nodemon_config`
-- `nodemon_restart`
-- `nodemon_quit`
+| Tool | Args | Purpose |
+| --- | --- | --- |
+| `nodemon_status` | — | Runtime status, pids, restart count, **lastCrash**, config summary |
+| `nodemon_watched_files` | `{ "limit": 50 }` | Files currently tracked by the watcher |
+| `nodemon_restart_history` | `{ "limit": 20 }` | Recent restarts with reasons/files |
+| `nodemon_last_crash` | — | Most recent crash (`null` if none) |
+| `nodemon_logs` | `{ "limit": 50, "type": "status" }` | Recent nodemon log lines |
+| `nodemon_config` | — | Active config summary |
+| `nodemon_restart` | — | Safely restart the child (same as `rs` / API) |
+| `nodemon_quit` | — | Quit the monitor (response flushes first) |
+
+## CLI
+
+```bash
+# HTTP + REST + optional MCP SSE (default when --mcp)
+node ./bin/nodemon.js --mcp --mcpPort 8765 --mcpHost 127.0.0.1 --ext js app.js
+
+# stdio transport for MCP clients that spawn nodemon
+node ./bin/nodemon.js --mcp-stdio --ext js app.js
+```
+
+Flags: `--mcp`, `--mcp-stdio`, `--mcpPort <n>`, `--mcpHost <host>`,
+`--mcpTransport http|stdio`.
+
+## Config (`nodemon.json`)
+
+```json
+{
+  "mcp": true,
+  "mcpPort": 8765,
+  "mcpHost": "127.0.0.1",
+  "mcpTransport": "http"
+}
+```
 
 ## Example (repo checkout)
 
@@ -30,6 +58,7 @@ node ./bin/nodemon.js --mcp --mcpPort 8765 --ext js test/fixtures/app.js
 ```bash
 curl -s http://127.0.0.1:8765/api/tools
 curl -s -X POST http://127.0.0.1:8765/api/tools/nodemon_status
+curl -s -X POST http://127.0.0.1:8765/api/tools/nodemon_last_crash
 curl -s -X POST http://127.0.0.1:8765/api/tools/nodemon_restart
 ```
 

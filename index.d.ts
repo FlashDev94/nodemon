@@ -13,7 +13,11 @@ export type NodemonEventHandler =
   | 'stderr';
 
 export type NodemonEventListener = {
-  on(event: 'start' | 'crash' | 'readable', listener: () => void): Nodemon;
+  on(event: 'readable', listener: () => void): Nodemon;
+  /** Optional child pid is passed when available (listeners may ignore it). */
+  on(event: 'start', listener: (pid?: number) => void): Nodemon;
+  /** Optional exit code is passed when available (listeners may ignore it). */
+  on(event: 'crash', listener: (code?: number | null) => void): Nodemon;
   on(event: 'log', listener: (e: NodemonEventLog) => void): Nodemon;
   on(event: 'stdout' | 'stderr', listener: (e: string) => void): Nodemon;
   on(

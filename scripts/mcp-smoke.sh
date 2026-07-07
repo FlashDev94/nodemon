@@ -35,6 +35,8 @@ echo "=== GET /api/tools ==="
 curl -s "$BASE/api/tools"; echo
 echo "=== POST /api/tools/nodemon_status ==="
 curl -s -X POST "$BASE/api/tools/nodemon_status"; echo
+echo "=== POST /api/tools/nodemon_last_crash ==="
+curl -s -X POST "$BASE/api/tools/nodemon_last_crash"; echo
 echo "=== GET /api/watched?limit=5 ==="
 curl -s "$BASE/api/watched?limit=5"; echo
 echo "=== POST /api/tools/nodemon_restart ==="
@@ -44,4 +46,6 @@ echo "=== POST /api/tools/nodemon_restart_history ==="
 curl -s -X POST "$BASE/api/tools/nodemon_restart_history" -H 'Content-Type: application/json' -d '{"limit":5}'; echo
 echo "=== POST /api/tools/nodemon_logs ==="
 curl -s -X POST "$BASE/api/tools/nodemon_logs" -H 'Content-Type: application/json' -d '{"limit":5}'; echo
+echo "=== POST /api/tools/nodemon_config ==="
+curl -s -X POST "$BASE/api/tools/nodemon_config"; echo
 echo "OK — MCP smoke passed (nodemon pid $PID). Log: $LOG"
