@@ -197,4 +197,214 @@ describe('nodemon monitor child restart', function () {
         }, 1000);
       });
   });
+
+  it('should ignore file changes during startUpWatchDelay', function (done) {
+    write();
+    var restarted = false;
+    var settled = false;
+    function finish(err) {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      nodemon.reset(function () {
+        done(err);
+      });
+    }
+
+    setTimeout(function () {
+      nodemon({
+        script: tmpjs,
+        verbose: true,
+        ext: 'js',
+        // ignore changes for 2s after the child starts
+        startUpWatchDelay: 2000,
+      })
+        .once('start', function () {
+          // touch while still inside the startup ignore window
+          setTimeout(function () {
+            touch.sync(tmpjs);
+          }, 200);
+        })
+        .on('restart', function () {
+          restarted = true;
+        });
+
+      // after startUpWatchDelay has elapsed, we should not have restarted
+      setTimeout(function () {
+        try {
+          assert(
+            restarted === false,
+            'nodemon must not restart during startUpWatchDelay'
+          );
+        } catch (err) {
+          nodemon.once('exit', function () {
+            finish(err);
+          }).emit('quit');
+          return;
+        }
+        nodemon.once('exit', function () {
+          finish();
+        }).emit('quit');
+      }, 2500);
+    }, WAIT_BEFORE_START);
+  });
+
+  it('should not apply restartLoopGuard when option is unset', function (done) {
+    write();
+    var restarts = 0;
+    var settled = false;
+    function finish(err) {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      nodemon.reset(function () {
+        done(err);
+      });
+    }
+
+    setTimeout(function () {
+      // no restartLoopGuard — normal restart behavior
+      nodemon({
+        script: tmpjs,
+        verbose: true,
+        ext: 'js',
+      })
+        .once('start', function () {
+          setTimeout(function () {
+            touch.sync(tmpjs);
+          }, 800);
+        })
+        .once('restart', function () {
+          restarts++;
+          try {
+            assert(restarts === 1, 'normal restart should still occur');
+          } catch (err) {
+            nodemon.once('exit', function () {
+              finish(err);
+            }).emit('quit');
+            return;
+          }
+          nodemon.once('exit', function () {
+            finish();
+          }).emit('quit');
+        });
+    }, WAIT_BEFORE_START);
+  });
+
+  it('should pause automatic restarts when restartLoopGuard trips', function (done) {
+    write();
+    var restarts = 0;
+    var sawLoopWarning = false;
+    var settled = false;
+    function finish(err) {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      nodemon.reset(function () {
+        done(err);
+      });
+    }
+
+    setTimeout(function () {
+      nodemon({
+        script: tmpjs,
+        verbose: true,
+        ext: 'js',
+        // trip quickly: 2 restarts within 5s
+        restartLoopGuard: { max: 2, window: 5000 },
+      })
+        .on('start', function () {
+          // hammer the file so we attempt more than `max` restarts
+          var n = 0;
+          var iv = setInterval(function () {
+            n++;
+            touch.sync(tmpjs);
+            if (n >= 6) {
+              clearInterval(iv);
+            }
+          }, 200);
+        })
+        .on('restart', function () {
+          restarts++;
+        })
+        .on('log', function (event) {
+          if (
+            event &&
+            event.message &&
+            /restart loop detected/i.test(event.message)
+          ) {
+            sawLoopWarning = true;
+          }
+        });
+
+      setTimeout(function () {
+        try {
+          assert(
+            restarts <= 2,
+            'expected at most 2 automatic restarts, got ' + restarts
+          );
+          assert(
+            sawLoopWarning === true,
+            'expected a clear restart-loop warning in logs'
+          );
+        } catch (err) {
+          nodemon.once('exit', function () {
+            finish(err);
+          }).emit('quit');
+          return;
+        }
+        nodemon.once('exit', function () {
+          finish();
+        }).emit('quit');
+      }, 3500);
+    }, WAIT_BEFORE_START);
+  });
+
+  it('should restart after startUpWatchDelay expires', function (done) {
+    write();
+    var settled = false;
+    function finish(err) {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      nodemon.reset(function () {
+        done(err);
+      });
+    }
+
+    setTimeout(function () {
+      nodemon({
+        script: tmpjs,
+        verbose: true,
+        ext: 'js',
+        startUpWatchDelay: 500,
+      })
+        .once('start', function () {
+          // wait until after the startup ignore window, then touch
+          setTimeout(function () {
+            touch.sync(tmpjs);
+          }, 1000);
+        })
+        .once('restart', function (files) {
+          try {
+            assert(
+              files && files.length > 0,
+              'nodemon should restart after startUpWatchDelay expires'
+            );
+          } catch (err) {
+            nodemon.once('exit', function () {
+              finish(err);
+            }).emit('quit');
+            return;
+          }
+          nodemon.once('exit', function () {
+            finish();
+          }).emit('quit');
+        });
+    }, WAIT_BEFORE_START);
+  });
 });

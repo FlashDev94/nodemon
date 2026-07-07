@@ -253,6 +253,245 @@ nodemon --delay 2.5
 }
 ```
 
+## Ignoring changes right after startup
+
+Some applications write generated files (caches, compiled assets, lock files, etc.) as soon as they start. Nodemon can see those writes and restart the process immediately, which can create a restart loop.
+
+Use `--startUpWatchDelay` (or `startUpWatchDelay` in config) to ignore file changes for a short period **after the child process starts**. Once that window ends, normal watching resumes. This is **not** the same as `--delay`, which waits *after a file change* before restarting.
+
+```bash
+# ignore changes for 2 seconds after each start
+nodemon --startUpWatchDelay 2 server.js
+
+# or with an explicit milliseconds specifier
+nodemon --startUpWatchDelay 2000ms server.js
+```
+
+In `nodemon.json` / `package.json` `nodemonConfig`, the value is always milliseconds:
+
+```json
+{
+  "startUpWatchDelay": 2000
+}
+```
+
+You can combine both options when needed: `startUpWatchDelay` suppresses the restart loop on boot; `delay` still debounces restarts from later edits.
+
+## Restart loop guard
+
+If something keeps changing watched files (or your app keeps writing to them), nodemon can restart in a tight loop. Enable **`restartLoopGuard`** so that when too many *automatic* file-change restarts happen within a short time window, nodemon **pauses** further automatic restarts and prints a clear warning instead of looping forever.
+
+This is **off by default**. When unset or `false`, restart behavior is unchanged. Manual restart (`rs` or the configured restartable command / signal) is **not** blocked.
+
+**CLI** (optional value; defaults are 10 restarts in 10 seconds):
+
+```bash
+# enable with defaults (10 restarts / 10s)
+nodemon --restartLoopGuard server.js
+
+# max 5 restarts in the default 10s window
+nodemon --restartLoopGuard 5 server.js
+
+# max 10 restarts within 5 seconds
+nodemon --restartLoopGuard 10/5s server.js
+
+# same with an explicit milliseconds window
+nodemon --restartLoopGuard 10/5000ms server.js
+```
+
+**Config** (`nodemon.json` / `nodemonConfig`):
+
+```json
+{
+  "restartLoopGuard": true
+}
+```
+
+```json
+{
+  "restartLoopGuard": {
+    "max": 10,
+    "window": 10000
+  }
+}
+```
+
+`window` in config is always milliseconds. After the window slides past older restarts, automatic restarts are allowed again; or type `rs` to force a restart while paused.
+
+## Restart reason
+
+Nodemon can tell you **why** it restarted. The `restart` event always receives an optional **second argument** (existing listeners that only use `files` keep working):
+
+| `reason.type` | Meaning |
+| --- | --- |
+| `watch` | A watched file changed (`reason.files` lists paths) |
+| `manual` | User typed the restartable command (default `rs`) |
+| `api` | `nodemon.restart()` / programmatic restart |
+| `signal` | Process signal used to request a restart |
+
+```js
+require('nodemon')({ script: 'server.js' }).on('restart', function (files, reason) {
+  console.log('restart type:', reason && reason.type);
+  if (files) console.log('files:', files);
+});
+```
+
+By default the reason is only written to **detail** logs (`--verbose`). To always print it at status level:
+
+```bash
+nodemon --restartReason server.js
+```
+
+```json
+{
+  "restartReason": true
+}
+```
+
+`restartReason` only affects **logging / event metadata**. It does not change *whether* a restart happens.
+
+## Filtering which file events restart the app (`restartOn`)
+
+By default nodemon restarts on **change**, **add**, and **unlink** (delete) events — same as always. Use **`restartOn`** to limit which filesystem events trigger a restart.
+
+| Value | Restarts on |
+| --- | --- |
+| `all` (default) | change, add, and unlink |
+| `change` | modifications only |
+| `add` | new files only (after the initial watch is ready) |
+| `unlink` | deletions only |
+| `change,add` | combination (comma-separated or array in config) |
+
+Unset / `all` keeps **full backward compatibility** with previous nodemon behavior. Manual restart (`rs`) is not affected.
+
+**CLI**
+
+```bash
+nodemon --restartOn change server.js
+nodemon --restartOn add server.js
+nodemon --restartOn change,add server.js
+```
+
+**Config**
+
+```json
+{
+  "restartOn": "change"
+}
+```
+
+```json
+{
+  "restartOn": ["change", "add"]
+}
+```
+
+`restartOn` and `restartReason` are independent: you can filter which events restart the process and still receive (or log) why a restart occurred.
+
+## MCP server mode (agent inspection & control)
+
+Nodemon can expose an **opt-in MCP (Model Context Protocol) surface** so an agent (or plain HTTP/`curl`) can inspect runtime status, watched files, restart history, **last crash**, config, and logs, and can **restart** or **quit** nodemon safely.
+
+**Off by default.** If you do not pass `--mcp` / set `"mcp": true`, behavior is unchanged and MCP is not started.
+
+**Security defaults (prod-oriented):**
+
+- Binds **`127.0.0.1` only** by default (no open network control plane)
+- **No** `Access-Control-Allow-Origin: *` (avoids browser CSRF to localhost)
+- Optional **`--mcpToken`** — when set, required on all routes except `GET /health`
+- Non-loopback bind (`--mcpHost 0.0.0.0`) is **refused** unless you pass **`--mcpAllowRemote` and `--mcpToken`**
+- JSON bodies capped at **1MB**; server **stops** cleanly on quit/reset (no port leak)
+- Full MCP SSE/stdio needs optional package `@modelcontextprotocol/sdk` (Node **>= 18**); **REST works without it**
+
+> **Practical note:** For hands-on testing, use **REST `/api/*`**. See also [doc/mcp.md](doc/mcp.md).
+
+### 1) Start nodemon with MCP (HTTP)
+
+```bash
+# from the nodemon repo checkout:
+node ./bin/nodemon.js --mcp --mcpPort 8765 --ext js test/fixtures/app.js
+
+# with token (recommended on shared machines):
+node ./bin/nodemon.js --mcp --mcpToken secret --mcpPort 8765 server.js
+
+# if nodemon is installed globally / via npx:
+nodemon --mcp --mcpPort 8765 server.js
+```
+
+If the port is busy, pick another: `--mcpPort 8877`.
+
+### 2) REST API (recommended for testing — no MCP client)
+
+Base URL: `http://127.0.0.1:8765` (or your `--mcpPort`).
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/health` | Liveness + tool name list (no auth) |
+| GET | `/api/status` | Runtime status + config summary |
+| GET | `/api/config` | Config summary only |
+| GET | `/api/watched?limit=50` | Watched files (tracks add/unlink) |
+| GET | `/api/history` | Restart history |
+| GET | `/api/logs?limit=50` | Recent nodemon logs (`?type=status` optional) |
+| GET | `/api/tools` | List MCP tool names/descriptions |
+| POST | `/api/tools/<name>` | **Invoke a tool** (JSON body = arguments) |
+| POST | `/api/restart` | Same as tool `nodemon_restart` |
+| POST | `/api/quit` | Same as tool `nodemon_quit` (exits nodemon) |
+
+**Example session (second terminal):**
+
+```bash
+PORT=8765
+BASE=http://127.0.0.1:$PORT
+# TOKEN=secret   # if you started with --mcpToken
+
+curl -s $BASE/health
+curl -s ${TOKEN:+-H "Authorization: Bearer $TOKEN"} $BASE/api/status
+curl -s ${TOKEN:+-H "Authorization: Bearer $TOKEN"} -X POST $BASE/api/tools/nodemon_status
+curl -s ${TOKEN:+-H "Authorization: Bearer $TOKEN"} -X POST $BASE/api/tools/nodemon_restart
+```
+
+One-shot smoke script from the repo:
+
+```bash
+bash scripts/mcp-smoke.sh 8765
+```
+
+### 3) MCP tools (for agents)
+
+| Tool | Arguments | Effect |
+| --- | --- | --- |
+| `nodemon_status` | — | Status snapshot (includes `lastCrash`, pids, config) |
+| `nodemon_watched_files` | `limit?` | Watched files |
+| `nodemon_restart_history` | `limit?` | Restart history (`trigger: mcp` for agent restarts) |
+| `nodemon_last_crash` | — | Most recent crash details (`null` if none) |
+| `nodemon_logs` | `limit?`, `type?` | Nodemon logs |
+| `nodemon_config` | — | Config summary |
+| `nodemon_restart` | — | Restart child (same as `rs` / API) |
+| `nodemon_quit` | — | Quit nodemon (response sent before exit) |
+
+**SSE MCP transport** (optional; requires optional SDK): `GET /mcp` then `POST /messages?sessionId=…`.
+
+### 4) stdio MCP (client spawns nodemon)
+
+```bash
+node ./bin/nodemon.js --mcp-stdio --ext js test/fixtures/app.js
+```
+
+**Caveat:** stdio is owned by the MCP protocol — prefer **HTTP `--mcp`** while developing.
+
+### Config (`nodemon.json`)
+
+```json
+{
+  "mcp": true,
+  "mcpPort": 8765,
+  "mcpHost": "127.0.0.1",
+  "mcpTransport": "http",
+  "mcpToken": null,
+  "mcpAllowRemote": false
+}
+```
+
 ## Gracefully reloading your script
 
 It is possible to have nodemon send any signal that you specify to your application.

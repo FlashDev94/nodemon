@@ -37,20 +37,27 @@ describe('when nodemon runs (2)', function () {
 
   it('should restart when new files are added', function (done) {
     fs.writeFileSync(tmp, 'setTimeout(function(){}, 10000)');
+    var settled = false;
+    function finish() {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      nodemon.reset(done);
+    }
 
     nodemon({
       script: tmp,
-    }).on('start', function () {
+    }).once('start', function () {
       setTimeout(function () {
         fs.writeFileSync(tmp2, 'setTimeout(function(){}, 10000)');
       }, 500);
-    }).on('restart', function () {
+    }).once('restart', function () {
       assert(fs.existsSync(tmp2), 'restarted after new file was added');
-      nodemon.once('exit', function () {
-        nodemon.reset(done);
-      }).emit('quit');
+      nodemon.once('exit', finish).emit('quit');
     });
   });
+
 
   it('should wait when the script crashes', function (done) {
     fs.writeFileSync(tmp, 'throw Error("forced crash")');
@@ -173,21 +180,18 @@ describe('when nodemon runs (2)', function () {
       assert(true, 'nodemon is waiting for a change');
 
       setTimeout(function () {
-        process.once('SIGINT', function () {
-          // do nothing
-        });
-
-        process.kill(process.pid, 'SIGINT');
+        // Emit quit via the nodemon API instead of signaling this process with
+        // SIGINT — mocha treats SIGINT as "abort the suite", which skipped all
+        // later tests and under-reported coverage.
+        nodemon.emit('quit');
       }, 1000);
     }).on('crash', function () {
       assert(false, 'detected crashed state');
     }).on('exit', function () {
       assert(true, 'quit correctly');
       nodemon.reset(done);
-
-      setTimeout(function () {
-        process.kill(process.pid, 'SIGINT');
-      }, 1000);
     });
   });
 });
+
+

@@ -17,16 +17,34 @@ describe('watch count', function () {
 
   after(function (done) {
     // clean up just in case.
-    nodemon.once('exit', function () {
+    var settled = false;
+    function finish() {
+      if (settled) {
+        return;
+      }
+      settled = true;
       nodemon.reset(done);
-    }).emit('quit');
+    }
+    nodemon.once('exit', finish);
+    // if nothing is running, exit may not fire — still finish
+    setTimeout(finish, 500);
+    nodemon.emit('quit');
   });
 
   it('should respect ignore rules', function (done) {
+    var settled = false;
+    function finish() {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      done();
+    }
+
     process.chdir('test/fixtures/watch-count');
-    nodemon({ script: appjs, verbose: true }).on('start', function () {
+    nodemon({ script: appjs, verbose: true }).once('start', function () {
       setTimeout(function () {
-        nodemon.once('exit', done).emit('quit');
+        nodemon.once('exit', finish).emit('quit');
       }, 200);
     }).on('log', function (data) {
       var match = null;
@@ -39,12 +57,21 @@ describe('watch count', function () {
   });
 
   it('should not watch directory when given a single file', function (done) {
+    var settled = false;
+    function finish() {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      done();
+    }
+
     process.chdir('test/fixtures/watch-count/');
     var watching = 0;
-    nodemon({ script: appjs, verbose: true, watch: appjs }).on('start', function () {
+    nodemon({ script: appjs, verbose: true, watch: appjs }).once('start', function () {
       setTimeout(function () {
         assert(watching === 1, `got ${watching} files`);
-        nodemon.once('exit', done).emit('quit');
+        nodemon.once('exit', finish).emit('quit');
       }, 200);
     }).on('watching', file => {
       watching++;
@@ -60,10 +87,19 @@ describe('watch count', function () {
 
 
   it('should ignore node_modules from any dir', function (done) {
+    var settled = false;
+    function finish() {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      done();
+    }
+
     process.chdir('test/fixtures/watch-count/lib');
-    nodemon({ script: appjs, verbose: true, watch: '..' }).on('start', function () {
+    nodemon({ script: appjs, verbose: true, watch: '..' }).once('start', function () {
       setTimeout(function () {
-        nodemon.once('exit', done).emit('quit');
+        nodemon.once('exit', finish).emit('quit');
       }, 200);
     }).on('log', function (data) {
       var match = null;
@@ -75,3 +111,4 @@ describe('watch count', function () {
     });
   });
 });
+
