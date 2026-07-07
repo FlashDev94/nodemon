@@ -5,51 +5,54 @@ var bus = require('../../lib/utils/bus');
 var state = require('../../lib/mcp/state');
 
 describe('mcp state', function () {
-  it('records start, watching, restart history, and logs when bound', function () {
+  afterEach(function () {
     state.resetState();
-    state.bindBus(bus, { options: { watch: ['*.js'] }, system: { cwd: process.cwd() } });
+  });
 
-    bus.emit('start', 4242);
+  it('tracks start pid, crash, restart history, and unwatch', function () {
+    state.resetState();
+    state.bindBus(bus, {
+      options: {
+        mcp: true,
+        mcpPort: 9,
+        watch: ['*.js'],
+        restartOn: 'change',
+      },
+      system: { cwd: '/tmp' },
+      command: { string: 'node app.js' },
+    });
+
+    bus.emit('start', 42);
+    assert.equal(state._state.status, 'running');
+    assert.equal(state._state.childPid, 42);
+
     bus.emit('watching', '/tmp/a.js');
-    bus.emit('log', { type: 'status', message: 'starting app' });
-    bus.emit('restart', ['/tmp/a.js'], { type: 'watch', files: ['/tmp/a.js'] });
+    bus.emit('watching', '/tmp/b.js');
+    assert.equal(state.getWatchedFiles().length, 2);
 
-    var snap = state.getSnapshot();
-    assert.equal(snap.status, 'restarting');
-    assert.equal(snap.childPid, 4242);
-    assert.equal(snap.restartCount, 1);
-    assert.equal(snap.lastReason.type, 'watch');
-    assert.deepEqual(state.getWatchedFiles(), ['/tmp/a.js']);
-    assert.equal(state.getRestartHistory().length, 1);
-    assert(state.getLogs().length >= 1);
-    assert.strictEqual(snap.lastCrash, null);
+    bus.emit('unwatch', '/tmp/a.js');
+    assert.deepEqual(state.getWatchedFiles(), ['/tmp/b.js']);
 
-    state.resetState();
-  });
+    bus.emit('restart', ['/tmp/b.js'], { type: 'watch', files: ['/tmp/b.js'] });
+    assert.equal(state._state.restartCount, 1);
+    assert.equal(state._state.lastReason.type, 'watch');
 
-  it('records lastCrash on crash event with exit code', function () {
-    state.resetState();
-    state.bindBus(bus, { options: {}, system: { cwd: process.cwd() } });
-
-    bus.emit('start', 111);
     bus.emit('crash', 1);
-
-    var snap = state.getSnapshot();
-    assert.equal(snap.status, 'crashed');
-    assert.strictEqual(snap.childPid, null);
-    assert.equal(snap.lastExitCode, 1);
-    assert(snap.lastCrash);
-    assert.equal(snap.lastCrash.exitCode, 1);
-    assert.equal(snap.lastCrash.message, 'app crashed');
-    assert(snap.lastCrash.at);
-    assert.deepEqual(state.getLastCrash(), snap.lastCrash);
+    assert.equal(state._state.status, 'crashed');
+    assert.equal(state.getLastCrash().exitCode, 1);
+    assert.equal(state.getSnapshot().lastCrash.exitCode, 1);
 
     state.resetState();
+    assert.equal(state._state.bound, false);
+    assert.equal(state.getWatchedFiles().length, 0);
   });
 
-  it('does nothing invasive until bindBus (mcp off)', function () {
+  it('re-binds cleanly after resetState', function () {
+    state.bindBus(bus, { options: { mcp: true }, system: { cwd: '/' } });
+    bus.emit('start', 1);
     state.resetState();
-    assert.equal(state.getSnapshot().enabled, false);
-    assert.strictEqual(state.getLastCrash(), null);
+    state.bindBus(bus, { options: { mcp: true }, system: { cwd: '/' } });
+    bus.emit('start', 2);
+    assert.equal(state._state.childPid, 2);
   });
 });

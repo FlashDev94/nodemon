@@ -394,25 +394,28 @@ Nodemon can expose an **opt-in MCP (Model Context Protocol) surface** so an agen
 
 **Off by default.** If you do not pass `--mcp` / set `"mcp": true`, behavior is unchanged and MCP is not started.
 
-> **Practical note:** For hands-on testing in a terminal, use the **REST `/api/*` endpoints** below. They call the **same handlers** as the MCP tools. Full MCP SSE is available at `GET /mcp` for clients that implement the older HTTP+SSE transport; most “quick tests” should use REST.
+**Security defaults (prod-oriented):**
+
+- Binds **`127.0.0.1` only** by default (no open network control plane)
+- **No** `Access-Control-Allow-Origin: *` (avoids browser CSRF to localhost)
+- Optional **`--mcpToken`** — when set, required on all routes except `GET /health`
+- Non-loopback bind (`--mcpHost 0.0.0.0`) is **refused** unless you pass **`--mcpAllowRemote` and `--mcpToken`**
+- JSON bodies capped at **1MB**; server **stops** cleanly on quit/reset (no port leak)
+- Full MCP SSE/stdio needs optional package `@modelcontextprotocol/sdk` (Node **>= 18**); **REST works without it**
+
+> **Practical note:** For hands-on testing, use **REST `/api/*`**. See also [doc/mcp.md](doc/mcp.md).
 
 ### 1) Start nodemon with MCP (HTTP)
-
-From this repo (or any install where `nodemon` is on your `PATH`):
 
 ```bash
 # from the nodemon repo checkout:
 node ./bin/nodemon.js --mcp --mcpPort 8765 --ext js test/fixtures/app.js
 
+# with token (recommended on shared machines):
+node ./bin/nodemon.js --mcp --mcpToken secret --mcpPort 8765 server.js
+
 # if nodemon is installed globally / via npx:
 nodemon --mcp --mcpPort 8765 server.js
-```
-
-Wait for a line like:
-
-```text
-[nodemon] MCP HTTP on http://127.0.0.1:8765 — try GET /api/status or GET /api/tools (SSE on /mcp)
-[nodemon] starting `node …`
 ```
 
 If the port is busy, pick another: `--mcpPort 8877`.
@@ -423,10 +426,10 @@ Base URL: `http://127.0.0.1:8765` (or your `--mcpPort`).
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/health` | Liveness + tool name list |
+| GET | `/health` | Liveness + tool name list (no auth) |
 | GET | `/api/status` | Runtime status + config summary |
 | GET | `/api/config` | Config summary only |
-| GET | `/api/watched?limit=50` | Watched files |
+| GET | `/api/watched?limit=50` | Watched files (tracks add/unlink) |
 | GET | `/api/history` | Restart history |
 | GET | `/api/logs?limit=50` | Recent nodemon logs (`?type=status` optional) |
 | GET | `/api/tools` | List MCP tool names/descriptions |
@@ -439,20 +442,12 @@ Base URL: `http://127.0.0.1:8765` (or your `--mcpPort`).
 ```bash
 PORT=8765
 BASE=http://127.0.0.1:$PORT
+# TOKEN=secret   # if you started with --mcpToken
 
 curl -s $BASE/health
-curl -s $BASE/api/status
-curl -s "$BASE/api/watched?limit=20"
-curl -s $BASE/api/tools
-
-# invoke tools (same as MCP tools/call)
-curl -s -X POST $BASE/api/tools/nodemon_status
-curl -s -X POST $BASE/api/tools/nodemon_logs -H 'Content-Type: application/json' -d '{"limit":10}'
-curl -s -X POST $BASE/api/tools/nodemon_restart
-curl -s $BASE/api/history
-
-# stop nodemon entirely:
-# curl -s -X POST $BASE/api/quit
+curl -s ${TOKEN:+-H "Authorization: Bearer $TOKEN"} $BASE/api/status
+curl -s ${TOKEN:+-H "Authorization: Bearer $TOKEN"} -X POST $BASE/api/tools/nodemon_status
+curl -s ${TOKEN:+-H "Authorization: Bearer $TOKEN"} -X POST $BASE/api/tools/nodemon_restart
 ```
 
 One-shot smoke script from the repo:
@@ -463,24 +458,18 @@ bash scripts/mcp-smoke.sh 8765
 
 ### 3) MCP tools (for agents)
 
-These names are what an MCP client lists/calls (and what `POST /api/tools/<name>` runs):
-
 | Tool | Arguments | Effect |
 | --- | --- | --- |
 | `nodemon_status` | — | Status snapshot (includes `lastCrash`, pids, config) |
 | `nodemon_watched_files` | `limit?` | Watched files |
-| `nodemon_restart_history` | `limit?` | Restart history |
+| `nodemon_restart_history` | `limit?` | Restart history (`trigger: mcp` for agent restarts) |
 | `nodemon_last_crash` | — | Most recent crash details (`null` if none) |
 | `nodemon_logs` | `limit?`, `type?` | Nodemon logs |
 | `nodemon_config` | — | Config summary |
 | `nodemon_restart` | — | Restart child (same as `rs` / API) |
 | `nodemon_quit` | — | Quit nodemon (response sent before exit) |
 
-**SSE MCP transport** (optional, for compatible MCP clients):
-
-- Stream: `GET http://127.0.0.1:8765/mcp`
-- Client then `POST` JSON-RPC to `/messages?sessionId=…` (session id comes from the SSE `endpoint` event)
-- This is the SDK’s **HTTP+SSE** style transport. If your client only supports **stdio** or **streamable HTTP**, use `--mcp-stdio` or the REST `/api/tools/*` bridge instead of assuming SSE works out of the box.
+**SSE MCP transport** (optional; requires optional SDK): `GET /mcp` then `POST /messages?sessionId=…`.
 
 ### 4) stdio MCP (client spawns nodemon)
 
@@ -488,26 +477,7 @@ These names are what an MCP client lists/calls (and what `POST /api/tools/<name>
 node ./bin/nodemon.js --mcp-stdio --ext js test/fixtures/app.js
 ```
 
-Example MCP client config shape (paths vary by product):
-
-```json
-{
-  "mcpServers": {
-    "nodemon": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/nodemon/bin/nodemon.js",
-        "--mcp-stdio",
-        "--ext",
-        "js",
-        "/absolute/path/to/your/app.js"
-      ]
-    }
-  }
-}
-```
-
-**Caveat:** stdio is owned by the MCP protocol — do not expect normal interactive TTY/`rs` use on the same streams. Prefer **HTTP `--mcp`** while developing.
+**Caveat:** stdio is owned by the MCP protocol — prefer **HTTP `--mcp`** while developing.
 
 ### Config (`nodemon.json`)
 
@@ -516,7 +486,9 @@ Example MCP client config shape (paths vary by product):
   "mcp": true,
   "mcpPort": 8765,
   "mcpHost": "127.0.0.1",
-  "mcpTransport": "http"
+  "mcpTransport": "http",
+  "mcpToken": null,
+  "mcpAllowRemote": false
 }
 ```
 

@@ -25,6 +25,15 @@ describe('nodemon MCP CLI flags', function () {
     assert.strictEqual(s.mcpHost, '0.0.0.0');
   });
 
+  it('parses --mcpToken and --mcpAllowRemote', function () {
+    var s = cli.parse(
+      'node nodemon --mcpToken secret --mcpAllowRemote test/fixtures/app.js'
+    );
+    assert.strictEqual(s.mcp, true);
+    assert.strictEqual(s.mcpToken, 'secret');
+    assert.strictEqual(s.mcpAllowRemote, true);
+  });
+
   it('does not enable mcp when flag absent', function () {
     var s = cli.parse('node nodemon test/fixtures/app.js');
     assert.strictEqual(s.mcp, undefined);

@@ -143,15 +143,27 @@ export interface NodemonConfig {
   restartOn?: 'all' | 'change' | 'add' | 'unlink' | string | string[];
   /**
    * Enable MCP server mode (default false). When false, behavior is unchanged
-   * and MCP code is not started.
+   * and MCP code is not started. SSE/stdio need optional dep
+   * `@modelcontextprotocol/sdk` (Node >= 18); REST works without it.
    */
   mcp?: boolean;
   /** MCP HTTP port when using http transport (default 8765) */
   mcpPort?: number;
-  /** MCP HTTP bind host (default 127.0.0.1) */
+  /** MCP HTTP bind host (default 127.0.0.1 — loopback only) */
   mcpHost?: string;
   /** 'http' (SSE + REST) or 'stdio' */
   mcpTransport?: 'http' | 'stdio' | string;
+  /**
+   * Shared secret for MCP HTTP/REST. When set, required on all routes except
+   * GET /health (Authorization: Bearer, X-Nodemon-Mcp-Token, or ?token=).
+   * Required when binding a non-loopback host with mcpAllowRemote.
+   */
+  mcpToken?: string | null;
+  /**
+   * Allow binding MCP HTTP to a non-loopback host. Must be combined with
+   * mcpToken. Default false.
+   */
+  mcpAllowRemote?: boolean;
   monitor?: string[];
   spawn?: boolean;
   noUpdateNotifier?: boolean;
@@ -175,7 +187,8 @@ export type Nodemon = {
   removeAllListeners(event: NodemonEventHandler): Nodemon;
   emit(type: NodemonEventHandler, event?: any): Nodemon;
   reset(callback: Function): Nodemon;
-  restart(): Nodemon;
+  /** Optional reason is passed through to the restart event / history. */
+  restart(reason?: NodemonRestartReason): Nodemon;
   config: NodemonSettings;
 } & NodemonEventListener & {
     [K in keyof NodemonEventListener as 'addListener']: NodemonEventListener[K];

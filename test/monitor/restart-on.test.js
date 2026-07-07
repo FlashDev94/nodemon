@@ -61,4 +61,20 @@ describe('shouldRestartOnEvent / restartOn', function () {
       assert.equal(shouldRestartOnEvent('add'), false);
     });
   });
+
+  it('falls back to all events for invalid restartOn values', function () {
+    var watch = require('../../lib/monitor/watch');
+    if (typeof watch._resetRestartOnWarning === 'function') {
+      watch._resetRestartOnWarning();
+    }
+    withRestartOn('modify', function () {
+      assert.equal(shouldRestartOnEvent('change'), true);
+      assert.equal(shouldRestartOnEvent('add'), true);
+      assert.equal(shouldRestartOnEvent('unlink'), true);
+    });
+    withRestartOn(['change', 'nope'], function () {
+      assert.equal(shouldRestartOnEvent('unlink'), true);
+    });
+  });
+
 });
