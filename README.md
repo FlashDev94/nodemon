@@ -67,6 +67,29 @@ Also check out the [FAQ](https://github.com/remy/nodemon/blob/master/faq.md) or 
 
 nodemon was originally written to restart hanging processes such as web servers, but now supports apps that cleanly exit. If your script exits cleanly, nodemon will continue to monitor the directory (or directories) and restart the script if there are any changes.
 
+## Kill timeout (force SIGKILL)
+
+By default, when nodemon restarts or stops your app it sends the configured signal (default `SIGUSR2`) and **waits for the process to exit**. If the app ignores that signal, the restart can hang.
+
+Use **`--kill-timeout <ms>`** so nodemon force-kills with `SIGKILL` only if the process is still alive after the timeout. If it exits in time, no force kill runs. **Off by default** — without the flag, behavior is unchanged.
+
+```bash
+# force-kill if still running 3s after the graceful signal
+nodemon --kill-timeout 3000 server.js
+
+# suffixes also work
+nodemon --kill-timeout 500ms server.js
+nodemon --kill-timeout 2s server.js
+```
+
+```json
+{
+  "killTimeout": 3000
+}
+```
+
+Bare numbers are **milliseconds** (unlike `--delay`, which is seconds unless you use `ms`).
+
 ## Manual restarting
 
 Whilst nodemon is running, if you need to manually restart your application, instead of stopping and restarting nodemon, you can type `rs` with a carriage return, and nodemon will restart your process.

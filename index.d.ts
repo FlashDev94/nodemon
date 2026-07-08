@@ -99,6 +99,11 @@ export interface NodemonConfig {
   runOnChangeOnly?: boolean;
   verbose?: boolean;
   signal?: string;
+  /**
+   * If the child has not exited this many ms after the stop/restart signal,
+   * force-kill with SIGKILL. 0 / unset = disabled (default; wait indefinitely).
+   */
+  killTimeout?: number;
   stdout?: boolean;
   watchOptions?: WatchOptions;
   help?: string;
