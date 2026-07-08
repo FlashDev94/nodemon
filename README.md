@@ -71,6 +71,30 @@ nodemon was originally written to restart hanging processes such as web servers,
 
 Whilst nodemon is running, if you need to manually restart your application, instead of stopping and restarting nodemon, you can type `rs` with a carriage return, and nodemon will restart your process.
 
+You can also pass **one-shot extra arguments** for a single run:
+
+```bash
+# while nodemon is running, type:
+rs --debug
+rs --port 4000 --env staging
+rs --name "my app"
+```
+
+Those extra args are **appended to the original command for that restart only**. After that one run, the next plain `rs`, `nodemon.restart()`, or (once the one-shot run has started) file-change restart uses the **original command** again.
+
+| Input | Effect |
+| --- | --- |
+| `rs` | Restart with the original command (same as always); cancels a pending one-shot |
+| `rs <args>` | Restart once with `<args>` appended; then back to original |
+| other stdin | Still forwarded to the child process (unchanged) |
+
+Programmatically, the same one-shot behaviour is available via:
+
+```js
+nodemon.restart({ args: ['--port', '4000'] }); // one run only
+nodemon.restart(); // original command (clears any pending one-shot)
+```
+
 ## Config files
 
 nodemon supports local and global configuration files. These are usually named `nodemon.json` and can be located in the current working directory or in your home directory. An alternative local configuration file can be specified with the `--config <file>` option.
@@ -328,6 +352,8 @@ Nodemon can tell you **why** it restarted. The `restart` event always receives a
 | `manual` | User typed the restartable command (default `rs`) |
 | `api` | `nodemon.restart()` / programmatic restart |
 | `signal` | Process signal used to request a restart |
+
+When restarting with one-shot extra args (`rs <args>` or `nodemon.restart({ args })`), `reason.args` is the string array of those args.
 
 ```js
 require('nodemon')({ script: 'server.js' }).on('restart', function (files, reason) {

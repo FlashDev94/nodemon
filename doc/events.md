@@ -14,9 +14,10 @@ nodemon will emit events based on the child process.
 - crash - child process has crashed (nodemon will not emit exit)
 - exit - child process has cleanly exited (i.e. no crash)
 - restart([ array of files triggering the restart ], reason?) - child process has restarted.
-  `reason` is `{ type, files?, trigger?, signal? }` where `type` is one of
-  `watch` | `manual` | `api` | `signal`. Existing listeners that only use
-  the first argument are unchanged.
+  `reason` is `{ type, files?, trigger?, signal?, args? }` where `type` is one of
+  `watch` | `manual` | `api` | `signal`. `args` is set when restarting with
+  one-shot extra child arguments (`rs <args>` or `nodemon.restart({ args })`).
+  Existing listeners that only use the first argument are unchanged.
 - config:update - nodemon's config has changed
 
 ## Messages

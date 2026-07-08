@@ -19,10 +19,14 @@ nodemon.on('start', function () {
   process.exit();
 }).on('restart', function (files, reason) {
   // `files` is set for watch-triggered restarts (backward compatible).
-  // `reason` describes why: { type: 'watch'|'manual'|'api'|'signal', ... }
+  // `reason` describes why: { type: 'watch'|'manual'|'api'|'signal', args?, ... }
   console.log('App restarted due to: ', files);
   console.log('Restart reason: ', reason && reason.type);
 });
+
+// One-shot extra args for a single run (same as typing `rs --port 4000`):
+// nodemon.restart({ args: ['--port', '4000'] });
+// The next restart uses the original command again.
 ```
 
 Enable status-level restart reason logs with `{ restartReason: true }` or `--restartReason`.
