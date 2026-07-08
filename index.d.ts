@@ -41,6 +41,12 @@ export type NodemonRestartReason = {
   trigger?: string;
   /** e.g. "SIGHUP" when type is signal */
   signal?: string;
+  /**
+   * One-shot extra args for this restart only (`rs <args>` or
+   * `nodemon.restart({ args })`). The following restart uses the original
+   * command again.
+   */
+  args?: string[];
 };
 
 export type NodemonEventLog = {
