@@ -88,6 +88,8 @@ Those extra args are **appended to the original command for that restart only**.
 | `rs <args>` | Restart once with `<args>` appended; then back to original |
 | other stdin | Still forwarded to the child process (unchanged) |
 
+**Safety:** one-shot args must not contain shell metacharacters (`;`, `|`, `&`, `$`, backticks, redirects, etc.). Unsafe args are refused and nodemon does **not** restart with them (avoids accidental shell injection on the spawn path).
+
 Programmatically, the same one-shot behaviour is available via:
 
 ```js
