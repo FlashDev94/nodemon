@@ -58,6 +58,105 @@ describe('restart-cmd parseRestartLine', function () {
   });
 });
 
+
+describe('restart-cmd shell-unsafe one-shot args', function () {
+  it('detects shell metacharacters and operators', function () {
+    assert.strictEqual(rc.isUnsafeOneShotArg('&&'), true);
+    assert.strictEqual(rc.isUnsafeOneShotArg('||'), true);
+    assert.strictEqual(rc.isUnsafeOneShotArg(';'), true);
+    assert.strictEqual(rc.isUnsafeOneShotArg('$(id)'), true);
+    assert.strictEqual(rc.isUnsafeOneShotArg('`id`'), true);
+    assert.strictEqual(rc.isUnsafeOneShotArg('a;b'), true);
+    assert.strictEqual(rc.isUnsafeOneShotArg('--port'), false);
+    assert.strictEqual(rc.isUnsafeOneShotArg('4000'), false);
+    assert.strictEqual(rc.isUnsafeOneShotArg('my app'), false);
+  });
+
+  it('validateOneShotArgs rejects unsafe lists', function () {
+    assert.deepEqual(rc.validateOneShotArgs(['--ok', '1']), { ok: true });
+    var bad = rc.validateOneShotArgs(['&&', 'echo', 'x']);
+    assert.strictEqual(bad.ok, false);
+    assert.ok(bad.unsafe.indexOf('&&') !== -1);
+  });
+
+  it('requestRestart refuses unsafe args and does not emit restart', function () {
+    var bus = require('../../lib/utils').bus;
+    var fired = false;
+    function onRestart() {
+      fired = true;
+    }
+    bus.on('restart', onRestart);
+    var ok = rc.requestRestart(undefined, {
+      type: 'manual',
+      trigger: 'rs',
+      args: ['&&', 'id'],
+    });
+    bus.removeListener('restart', onRestart);
+    assert.strictEqual(ok, false);
+    assert.strictEqual(fired, false);
+  });
+});
+
+describe('restart-cmd requestRestart ownership', function () {
+  it('plain manual/api requestRestart clears pending one-shot', function () {
+    var config = require('../../lib/config');
+    config.commandBase = { executable: 'node', args: ['app.js'] };
+    config.oneShotArgs = ['--stale'];
+    config.command = {
+      raw: config.commandBase,
+      string: 'node app.js',
+    };
+
+    var bus = require('../../lib/utils').bus;
+    function onRestart() {}
+    bus.on('restart', onRestart);
+
+    rc.requestRestart(undefined, { type: 'api' });
+    assert.strictEqual(config.oneShotArgs, null, 'api clears pending');
+
+    config.oneShotArgs = ['--stale2'];
+    rc.requestRestart(undefined, { type: 'manual', trigger: 'rs' });
+    assert.strictEqual(config.oneShotArgs, null, 'manual clears pending');
+
+    config.oneShotArgs = ['--keep'];
+    rc.requestRestart(['a.js'], { type: 'watch', files: ['a.js'] });
+    assert.deepEqual(config.oneShotArgs, ['--keep'], 'watch leaves pending');
+
+    config.oneShotArgs = ['--keep2'];
+    rc.requestRestart(undefined, { type: 'signal', signal: 'SIGHUP' });
+    assert.deepEqual(config.oneShotArgs, ['--keep2'], 'signal leaves pending');
+
+    bus.removeListener('restart', onRestart);
+    config.oneShotArgs = null;
+  });
+
+  it('requestRestart with safe args queues one-shot', function () {
+    var config = require('../../lib/config');
+    config.commandBase = { executable: 'node', args: ['app.js'] };
+    config.oneShotArgs = null;
+
+    var bus = require('../../lib/utils').bus;
+    var saw = null;
+    function onRestart(files, reason) {
+      saw = reason;
+    }
+    bus.on('restart', onRestart);
+
+    var ok = rc.requestRestart(undefined, {
+      type: 'manual',
+      trigger: 'rs',
+      args: ['--port', '4000'],
+    });
+    bus.removeListener('restart', onRestart);
+
+    assert.strictEqual(ok, true);
+    assert.deepEqual(config.oneShotArgs, ['--port', '4000']);
+    assert.deepEqual(saw.args, ['--port', '4000']);
+    config.oneShotArgs = null;
+  });
+});
+
+
 describe('restart-cmd materializeCommand / one-shot lifecycle', function () {
   it('appends one-shot args once then restores original', function () {
     var config = {
@@ -124,7 +223,6 @@ describe('formatRestartReason with one-shot args', function () {
 
 describe('one-shot rs args (integration)', function () {
   var nodemon = require('../../lib/');
-  var emitRestart = require('../../lib/monitor/restart-reason').emitRestart;
   var tmp;
   var scriptBody = 'setInterval(function () {}, 60000);\n';
 
@@ -246,8 +344,7 @@ describe('one-shot rs args (integration)', function () {
       trackCommands(function (commands, n) {
         if (n === 1) {
           setTimeout(function () {
-            rc.setOneShotArgs(nodemon.config, parsed.extraArgs);
-            emitRestart(undefined, {
+            rc.requestRestart(undefined, {
               type: 'manual',
               trigger: 'rs',
               args: parsed.extraArgs,
@@ -263,8 +360,7 @@ describe('one-shot rs args (integration)', function () {
             return finish(e);
           }
           setTimeout(function () {
-            rc.setOneShotArgs(nodemon.config, null);
-            emitRestart(undefined, { type: 'manual', trigger: 'rs' });
+            rc.requestRestart(undefined, { type: 'manual', trigger: 'rs' });
           }, 300);
         } else if (n === 3) {
           try {
@@ -280,6 +376,47 @@ describe('one-shot rs args (integration)', function () {
         }
       })
     );
+  });
+
+
+  it('unsafe one-shot args via API do not change the running command', function (done) {
+    this.timeout(15000);
+    var settled = false;
+    function finish(err) {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      done(err);
+    }
+    var starts = 0;
+    var original = null;
+
+    nodemon({
+      script: tmp,
+      ext: 'js',
+      stdout: false,
+      restartable: false,
+    }).on('start', function () {
+      starts += 1;
+      var cmd = nodemon.config.command.string;
+      if (starts === 1) {
+        original = cmd;
+        setTimeout(function () {
+          nodemon.restart({ args: ['&&', 'echo', 'pwn'] });
+          setTimeout(function () {
+            try {
+              assert.equal(starts, 1, 'no restart after unsafe args');
+              assert.equal(nodemon.config.command.string, original);
+              assert.strictEqual(nodemon.config.oneShotArgs, null);
+              finish();
+            } catch (e) {
+              finish(e);
+            }
+          }, 500);
+        }, 300);
+      }
+    });
   });
 
   it('watch restart after one-shot does not keep extra args', function (done) {
